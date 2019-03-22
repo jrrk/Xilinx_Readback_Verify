@@ -36,19 +36,15 @@ uint32_t verify_full_readback(FILE* readback_data,
                               FILE* rbd_file,
                               FILE* msd_file,
                               int no_pad,
-                              int no_bram,
                               int fpga_series) {
   
   char gold_line[WORD_SIZE];
   char mask_line[WORD_SIZE];
+  char rb_line[WORD_SIZE];
   
   uint32_t data;
   uint32_t mask;
-  uint32_t gold;
-  size_t result;
-  
-
-  
+  uint32_t gold;  
   uint32_t line_number = 0;
   // If pad frame is not included in data file, advance past it in MSD/RBD
   if (no_pad == TRUE) {
@@ -68,29 +64,21 @@ uint32_t verify_full_readback(FILE* readback_data,
   }
   
   // Read line by line (including newline character)
-  while(fgets(gold_line, WORD_SIZE, rbd_file) != NULL && fgets(mask_line, WORD_SIZE, msd_file) != NULL) {
+  while(fgets(gold_line, WORD_SIZE, rbd_file) != NULL &&
+        fgets(mask_line, WORD_SIZE, msd_file) != NULL &&
+        fgets(rb_line, WORD_SIZE, readback_data) != NULL) {
     line_number++;
     
     // Eliminate newline
     gold_line[32] = '\0';
     mask_line[32] = '\0';
+    rb_line[32] = '\0';
     
     // Convert to Binary
     mask = convert_ascii_to_binary(mask_line);
     gold = convert_ascii_to_binary(gold_line);
-    result = fread(&data, sizeof(uint32_t), 1, readback_data); //read 4 bytes into data
+    data = convert_ascii_to_binary(rb_line);
     
-    // If BRAM's weren't included, then still report true
-    if (result != 1) {
-      if (no_bram == TRUE) {
-        printf("Stopped comparison on line: %d\n", line_number);
-        return TRUE;
-      }
-      else {
-        return FALSE;
-      }
-    }
-
     // Compare the values
     if (verify_readback_word(data, gold, mask) == FALSE) {
       printf("Not equal from line: %d\n", line_number);

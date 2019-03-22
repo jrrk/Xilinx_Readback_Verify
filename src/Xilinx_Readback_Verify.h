@@ -20,5 +20,4 @@ uint32_t verify_full_readback(FILE* readback_data,
                               FILE* rbd_file,
                               FILE* msd_file,
                               int no_pad,
-                              int no_bram,
                               int fpga_series);

@@ -24,7 +24,6 @@ int compare(char a[], char b[]) {
 
 int main(int argc, char *argv[]) {
     int ignore_pad_frame = FALSE;
-    int ignore_brams = FALSE;
     int fpga_series = 5; // default is Virtex 5
     char* rbd_path;
     char* msd_path;
@@ -37,15 +36,12 @@ int main(int argc, char *argv[]) {
     int i;
     for(i = 1; i < argc; i++) {
       if(compare(argv[i], "--help") == 0) {
-        printf("USAGE:\t./verify_readback [-v <5/7>] [-no_pad] [-no_bram]\n");
+        printf("USAGE:\t./verify_readback [-v <5/7>] [-no_pad]\n");
         printf("\t\t\t [-rbd <filepath>] [-msd <filepath>] [-data <filepath>]\n");
         return 0;
       }
       else if (compare(argv[i], "-no_pad") == 0) {
         ignore_pad_frame = TRUE;
-      }
-      else if (compare(argv[i], "-no_bram") == 0) {
-        ignore_brams = TRUE;
       }
       else if (compare(argv[i], "-v") == 0) {
         fpga_series = strtol(argv[i+1], NULL, 10);
@@ -84,12 +80,6 @@ int main(int argc, char *argv[]) {
     else {
       printf("Verification will NOT ignore the pad frame.\n");
     }
-    if (ignore_brams) {
-      printf("Verification will ignore the BRAMs.\n");
-    }
-    else {
-      printf("Verification will NOT ignore the BRAMs.\n");
-    }
     if (fpga_series == 5) {
       printf("Verification expects a Virtex 5 Device\n");
     }
@@ -101,6 +91,8 @@ int main(int argc, char *argv[]) {
     FILE* rbd_file;
     FILE* msd_file;
     FILE* data_file;
+    char comment[99];
+    
     data_file = fopen(data_path, "rb");
     rbd_file = fopen(rbd_path, "r");
     msd_file = fopen(msd_path, "r");
@@ -117,12 +109,15 @@ int main(int argc, char *argv[]) {
       printf("Could not open %s\n", msd_path);
       return 0;
     }
+
+    /* Remove Vivado generated comments */
+    for (i = 0; i < 8; i++) fgets(comment, sizeof(comment), rbd_file);
+    for (i = 0; i < 8; i++) fgets(comment, sizeof(comment), msd_file);
     
     if (verify_full_readback( data_file, 
                               rbd_file,
                               msd_file,
                               ignore_pad_frame,
-                              ignore_brams,
                               fpga_series) == TRUE) {
       printf("\n>>>> Readback data is correct! <<<<\n");
     }
