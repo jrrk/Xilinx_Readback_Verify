@@ -15,7 +15,7 @@ uint32_t convert_ascii_to_binary(char* ascii_string) {
 }
 
 // Given the binary values of a word in a frame, determine if they are equal
-uint32_t verify_readback_word(uint32_t data, uint32_t gold, uint32_t mask) {
+uint32_t verify_readback_word(uint32_t data, uint32_t gold, uint32_t mask, uint32_t start, int ll_min, int ll_max) {
   
   // Mask Gold with Mask
   uint32_t masked_gold = gold & (~mask);
@@ -23,6 +23,17 @@ uint32_t verify_readback_word(uint32_t data, uint32_t gold, uint32_t mask) {
   
   // compare and return  
   if (masked_data == masked_gold) {
+    int bit = start*32;
+    if (bit+31 >= ll_min && bit < ll_max) while (mask)
+      {
+        if (ll_entries[bit].net)
+          {
+            ll_entries[bit].lev = data&1;
+          }
+        data >>= 1;
+        mask >>= 1;
+        ++bit;
+      }
     return TRUE;
   }
   else {
@@ -36,7 +47,8 @@ uint32_t verify_full_readback(FILE* readback_data,
                               FILE* rbd_file,
                               FILE* msd_file,
                               int no_pad,
-                              int fpga_series) {
+                              int fpga_series,
+                              int ll_min, int ll_max) {
   
   char gold_line[WORD_SIZE];
   char mask_line[WORD_SIZE];
@@ -72,7 +84,7 @@ uint32_t verify_full_readback(FILE* readback_data,
     // Eliminate newline
     gold_line[32] = '\0';
     mask_line[32] = '\0';
-    rb_line[32] = '\0';
+      rb_line[32] = '\0';
     
     // Convert to Binary
     mask = convert_ascii_to_binary(mask_line);
@@ -80,7 +92,7 @@ uint32_t verify_full_readback(FILE* readback_data,
     data = convert_ascii_to_binary(rb_line);
     
     // Compare the values
-    if (verify_readback_word(data, gold, mask) == FALSE) {
+    if (verify_readback_word(data, gold, mask, line_number-1, ll_min, ll_max) == FALSE) {
       printf("Not equal from line: %d\n", line_number);
       return FALSE;
     }    

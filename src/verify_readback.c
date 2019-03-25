@@ -3,7 +3,13 @@
 // 30 March 2015
 
 #include <stdlib.h>
+#include <string.h>
+#include <stdlib.h>
+#include <search.h>
+#include <assert.h>
 #include "Xilinx_Readback_Verify.h"
+
+value_t *ll_entries = NULL;
 
 int compare(char a[], char b[]) {
   int c = 0;
@@ -28,10 +34,15 @@ int main(int argc, char *argv[]) {
     char* rbd_path;
     char* msd_path;
     char* data_path;
+    char* ll_path;
     int rbd_set = FALSE;
     int msd_set = FALSE;
     int data_set = FALSE;
-    
+    int ll_set = FALSE;
+    int ll_cnt = 0;
+    int ll_max = 0;
+    int ll_min;
+    net_t *head = NULL;
     // Parse commandline arguments
     int i;
     for(i = 1; i < argc; i++) {
@@ -63,6 +74,10 @@ int main(int argc, char *argv[]) {
         data_path = argv[i+1];
         data_set++;
       }
+      else if (compare(argv[i], "-ll") == 0) {
+        ll_path = argv[i+1];
+        ll_set++;
+      }
     }
     
     if (rbd_set != TRUE || msd_set != TRUE || data_set != TRUE) {
@@ -91,7 +106,8 @@ int main(int argc, char *argv[]) {
     FILE* rbd_file;
     FILE* msd_file;
     FILE* data_file;
-    char comment[99];
+    FILE* ll_file;
+    char comment[256];
     
     data_file = fopen(data_path, "rb");
     rbd_file = fopen(rbd_path, "r");
@@ -113,12 +129,47 @@ int main(int argc, char *argv[]) {
     /* Remove Vivado generated comments */
     for (i = 0; i < 8; i++) fgets(comment, sizeof(comment), rbd_file);
     for (i = 0; i < 8; i++) fgets(comment, sizeof(comment), msd_file);
+
+    hcreate(65535);
+    if (ll_set)
+      {
+        net_t *ptr;
+        ll_file = fopen(ll_path, "r");
+        while (fgets(comment, sizeof(comment), ll_file) != NULL)
+          {
+            char *pos = strstr(comment, "Net=");
+            if (pos && !strncmp(comment, "Bit ", 4))
+              {
+                net_t *nxt = malloc(sizeof(net_t));
+                int key = atoi(comment+4);
+                if (key >= ll_max)
+                  ll_max = key+1;
+                nxt->key = key;
+                nxt->net = strdup(pos+4);
+                nxt->nxt = head;
+                head = nxt;
+                ll_cnt++;
+              }
+          }
+        fclose(ll_file);
+        ll_entries = calloc(ll_max, sizeof(net_t));
+        ptr = head;
+        ll_min = ll_max;
+        while (ptr)
+          {
+            if (ptr->key < ll_min)
+              ll_min = ptr->key;
+            ll_entries[ptr->key].net = ptr->net;
+            ptr = ptr->nxt;
+          }
+        printf("ll_cnt = %d, ll_min = %d, ll_max = %d\n", ll_cnt, ll_min, ll_max);
+      }
     
     if (verify_full_readback( data_file, 
                               rbd_file,
                               msd_file,
                               ignore_pad_frame,
-                              fpga_series) == TRUE) {
+                              fpga_series, ll_min, ll_max) == TRUE) {
       printf("\n>>>> Readback data is correct! <<<<\n");
     }
     else {
